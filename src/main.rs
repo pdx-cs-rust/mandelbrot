@@ -57,6 +57,7 @@ fn test_parse_pair() {
 /// Parse a pair of floating-point numbers separated by a comma as a complex
 /// number.
 fn parse_complex(s: &str) -> Option<Complex<f64>> {
+    #[allow(clippy::manual_map)]
     match parse_pair(s, ',') {
         Some((re, im)) => Some(Complex { re, im }),
         None => None
@@ -127,38 +128,35 @@ fn render(pixels: &mut [u8],
     }
 }
 
-use image::ColorType;
-use image::png::PNGEncoder;
+use image::ExtendedColorType;
+use image::ImageEncoder;
+use image::codecs::png::PngEncoder;
 use std::fs::File;
 
 /// Write the buffer `pixels`, whose dimensions are given by `bounds`, to the
 /// file named `filename`.
 fn write_image(filename: &str, pixels: &[u8], bounds: (usize, usize))
-    -> Result<(), std::io::Error>
+    -> Result<(), Box<dyn std::error::Error>>
 {
     let output = File::create(filename)?;
 
-    let encoder = PNGEncoder::new(output);
-    encoder.encode(&pixels,
+    let encoder = PngEncoder::new(output);
+    encoder.write_image(pixels,
                    bounds.0 as u32, bounds.1 as u32,
-                   ColorType::Gray(8))?;
+                   ExtendedColorType::L8)?;
 
     Ok(())
 }
-
-use std::io::Write;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() != 5 {
-        writeln!(std::io::stderr(),
-                 "Usage: mandelbrot FILE PIXELS UPPERLEFT LOWERRIGHT")
-            .unwrap();
-        writeln!(std::io::stderr(),
-                 "Example: {} mandel.png 1000x750 -1.20,0.35 -1,0.20",
-                 args[0])
-            .unwrap();
+        eprintln!("Usage: mandelbrot FILE PIXELS UPPERLEFT LOWERRIGHT");
+        eprintln!(
+            "Example: {} mandel.png 1000x750 -1.20,0.35 -1,0.20",
+            args[0],
+        );
         std::process::exit(1);
     }
 
@@ -179,7 +177,7 @@ fn main() {
             .collect();
 
         bands.into_par_iter()
-            .weight_max()
+            .with_max_len(1)
             .for_each(|(i, band)| {
                 let top = i;
                 let band_bounds = (bounds.0, 1);
